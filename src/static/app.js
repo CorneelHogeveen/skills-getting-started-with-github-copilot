@@ -20,11 +20,33 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const spotsLeft = details.max_participants - details.participants.length;
 
+        const participants = details.participants || [];
+
+        let participantsHTML = "";
+        if (participants.length) {
+          participantsHTML = `
+            <div class="participants-card">
+              <h5>Participants</h5>
+              <ul class="participants-list">
+                ${participants.map((p) => `<li class="participant-item" data-activity="${name}" data-email="${p}"><span>${p}</span><button class="delete-btn" title="Remove participant">×</button></li>`).join("")}
+              </ul>
+            </div>
+          `;
+        } else {
+          participantsHTML = `
+            <div class="participants-card no-participants">
+              <h5>Participants</h5>
+              <p>None yet</p>
+            </div>
+          `;
+        }
+
         activityCard.innerHTML = `
           <h4>${name}</h4>
           <p>${details.description}</p>
           <p><strong>Schedule:</strong> ${details.schedule}</p>
           <p><strong>Availability:</strong> ${spotsLeft} spots left</p>
+          ${participantsHTML}
         `;
 
         activitiesList.appendChild(activityCard);
@@ -40,6 +62,48 @@ document.addEventListener("DOMContentLoaded", () => {
       console.error("Error fetching activities:", error);
     }
   }
+
+  // Handle participant deletion
+  activitiesList.addEventListener("click", async (event) => {
+    if (event.target.classList.contains("delete-btn")) {
+      const participantItem = event.target.closest(".participant-item");
+      if (!participantItem) return;
+
+      const activity = participantItem.dataset.activity;
+      const email = participantItem.dataset.email;
+
+      try {
+        const response = await fetch(
+          `/activities/${encodeURIComponent(activity)}/unregister?email=${encodeURIComponent(email)}`,
+          {
+            method: "DELETE",
+          }
+        );
+
+        if (response.ok) {
+          participantItem.remove();
+          messageDiv.textContent = `${email} has been removed from ${activity}`;
+          messageDiv.className = "success";
+          messageDiv.classList.remove("hidden");
+          setTimeout(() => {
+            messageDiv.classList.add("hidden");
+          }, 3000);
+          // Refresh to update availability
+          fetchActivities();
+        } else {
+          const result = await response.json();
+          messageDiv.textContent = result.detail || "Failed to remove participant";
+          messageDiv.className = "error";
+          messageDiv.classList.remove("hidden");
+        }
+      } catch (error) {
+        messageDiv.textContent = "Error removing participant";
+        messageDiv.className = "error";
+        messageDiv.classList.remove("hidden");
+        console.error("Error removing participant:", error);
+      }
+    }
+  });
 
   // Handle form submission
   signupForm.addEventListener("submit", async (event) => {
